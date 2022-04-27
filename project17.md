@@ -198,3 +198,93 @@ variable "preferred_number_of_private-data_subnets" {
     default = 2
 }
 ~~~
+
+Use
+~~~
+terraform validate
+~~~
+To check the validity of the codes so far
+
+![](terraform-validate.jpg)
+
+The *terraform.tfvars* file should look like this:
+
+~~~
+variable "region" {
+        default = "us-east-1"
+    }
+    
+variable "vpc_cidr" {
+        default = "172.16.0.0/16"
+    }
+
+variable "enable_dns_support" {
+        default = "true"
+    }
+
+variable "enable_dns_hostnames" {
+        default ="true" 
+    }
+
+variable "enable_classiclink" {
+        default = "false"
+    }
+
+variable "enable_classiclink_dns_support" {
+        default = "false"
+    }
+    
+variable "account_no" {
+  type        = number
+  description = "the account number"
+}
+
+variable "master-username" {
+  type        = string
+  description = "RDS admin username"
+}
+
+variable "master-password" {
+  type        = string
+  description = "RDS master password"
+}
+
+variable "tags" {
+  description = "A mapping of tags to assign to all resources."
+  type        = map(string)
+  default     = {}
+}
+
+variable "preferred_number_of_public_subnets" {
+    default = 2
+}
+
+variable "preferred_number_of_private-webs_subnets" {
+    default = 2
+}
+
+
+variable "preferred_number_of_private-data_subnets" {
+    default = 2
+}
+
+environment = "production"
+
+ami = "ami-0b0af3577fe5e3532"
+
+keypair = "evops"
+
+# Ensure to change this to your acccount number
+account_no = "760200903907"
+
+db-username = "bayo"
+
+db-password = "bayodevops"
+
+tags = {
+  Enviroment      = "production" 
+  Owner-Email     = "badedeji@gmail.com"
+  Managed-By      = "Terraform"
+  Billing-Account = "760200903907"
+}
+~~~
