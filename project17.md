@@ -185,6 +185,17 @@ variable "tags" {
   default     = {}
 }
 
+
+variable "ami" {
+  type        = string
+  description = "AMI ID for the launch template"
+}
+
+variable "keypair" {
+  type        = string
+  description = "key pair for the instances"
+}
+
 variable "preferred_number_of_public_subnets" {
     default = 2
 }
@@ -197,6 +208,7 @@ variable "preferred_number_of_private-webs_subnets" {
 variable "preferred_number_of_private-data_subnets" {
     default = 2
 }
+
 ~~~
 
 Use
@@ -210,63 +222,23 @@ To check the validity of the codes so far
 The *terraform.tfvars* file should look like this:
 
 ~~~
-variable "region" {
-        default = "us-east-1"
-    }
-    
-variable "vpc_cidr" {
-        default = "172.16.0.0/16"
-    }
+region = "us-east-1"
 
-variable "enable_dns_support" {
-        default = "true"
-    }
+vpc_cidr = "172.16.0.0/16" 
 
-variable "enable_dns_hostnames" {
-        default ="true" 
-    }
+enable_dns_support = "true" 
 
-variable "enable_classiclink" {
-        default = "false"
-    }
+enable_dns_hostnames = "true"  
 
-variable "enable_classiclink_dns_support" {
-        default = "false"
-    }
-    
-variable "account_no" {
-  type        = number
-  description = "the account number"
-}
+enable_classiclink = "false" 
 
-variable "master-username" {
-  type        = string
-  description = "RDS admin username"
-}
+enable_classiclink_dns_support = "false" 
 
-variable "master-password" {
-  type        = string
-  description = "RDS master password"
-}
+preferred_number_of_public_subnets = 2
 
-variable "tags" {
-  description = "A mapping of tags to assign to all resources."
-  type        = map(string)
-  default     = {}
-}
+preferred_number_of_private-webs_subnets = 2
 
-variable "preferred_number_of_public_subnets" {
-    default = 2
-}
-
-variable "preferred_number_of_private-webs_subnets" {
-    default = 2
-}
-
-
-variable "preferred_number_of_private-data_subnets" {
-    default = 2
-}
+preferred_number_of_private-data_subnets = 2
 
 environment = "production"
 
@@ -277,9 +249,9 @@ keypair = "evops"
 # Ensure to change this to your acccount number
 account_no = "760200903907"
 
-db-username = "bayo"
+master-username = "bayo"
 
-db-password = "bayodevops"
+master-password = "bayodevops"
 
 tags = {
   Enviroment      = "production" 
@@ -288,3 +260,12 @@ tags = {
   Billing-Account = "760200903907"
 }
 ~~~
+
+**Additional tasks**
+1. **IP Address**: This is a means of uniquely identifying a computer host on a network. There are two versions currently in use, IPV4 and IPV6. IPV4 is a 32bit address written in dot notation like this 172.17.16.1, depending on the cidr used, a part of the address refers to the network portion while the other part describes the host part. IPV6 on the other hand is 128bit long, meaning there are 2 raise to the power of 128 (trillion trillion trillion possible addresses) It is written in hex format as against IPV4 which is written in decimal format. 00ab::45EA:1234::0A::0 
+1. **Subnets**: A subnet is a logical delineation of a larger network to seperate network host for security and other network management reasons. So a big network can besub-divided into smaller ones. 10.0.0.0/24 (256 addresses) can be divided into 10.0.0.0/25 and 10.0.0.128/23 (126 addresses each)
+1. **CIDR Notation**: Was invented to further extend the availability of IPV4 when it was noticed that it will be exhausted soon. It helped to cut IPV$ wastages when a network/ organisation is assigned too large IPV4 space then required under old Classful allocation method. A network that needs 20 IPs shouldn't be given a class C block (256 address) with CIDR, a /27 (30 possible addresses) can be allocated
+1. **IP Routing**: IP routing is the process of moving IP packets across networks. 
+1. **Internet**: The internet is the interconnection of computers worldwide. It was developed from the concept of LANs (Local Area Network) which was primarily to share resources rather than duplicate resources like printers etc. The development of TCP/IP protocol made the emmergence of the internet as we know it today easier. 
+1. **Gateways**: Gatways are  devices that allow traffic to pass through from one network to the other. Routers are gateways.
+1. **NAT**: Net Address Translation was designed to slow down the exhaustion of IPV4 addresses, but allowing multiple private IPV4 addresses access the internet using a single public address. All the traffic from the private IPs are represented by the public IPV4
