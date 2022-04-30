@@ -1,4 +1,120 @@
-# Project 17 Automate Infrastructure With IAC using Terraform Part 2 (Storage and Database) # 
+# Project 17 Automate Infrastructure With IAC using Terraform Part 2 # 
+
+## Private Subnets ##
+Create two groups of Private subnets
+1. Webservers Private Subnet (one per AZ)
+1. atalayer Private Subnet (one per AZ)
+
+
+Make sure you use variables or *length()* function to determine the number of AZs
+Use variables and *cidrsubnet()* function to allocate vpc_cidr for subnets
+Keep variables and resources in separate files for better code structure and readability
+Tags all the resources you have created so far. Explore how to use format() and count functions to automatically tag subnets with its respective number.
+
+### A little bit more about Tagging ###
+Tagging is a straightforward, but a very powerful concept that helps you manage your resources much more efficiently:
+
+Resources are much better organized in ‘virtual’ groups
+- They can be easily filtered and searched from console or programmatically
+- Billing team can easily generate reports and determine how much each part of infrastructure costs how much (by department, by type, by environment, etc.)
+- You can easily determine resources that are not being used and take actions accordingly
+- If there are different teams in the organisation using the same account, tagging can help differentiate who owns which resources.
+
+Now you can tag all you resources using the format below
+~~~
+tags = merge(
+    var.tags,
+    {
+      Name = "Name of the resource"
+    },
+  )
+~~~
+
+NOTE: Update the variables.tf to declare the variable tags used in the format above;
+~~~
+variable "tags" {
+  description = "A mapping of tags to assign to all resources."
+  type        = map(string)
+  default     = {}
+}
+~~~
+The nice thing about this is – anytime we need to make a change to the tags, we simply do that in one single place (terraform.tfvars).
+
+### Internet Gateways & format() function ###
+Create an Internet Gateway in a separate Terraform file internet_gateway.tf
+~~~
+resource "aws_internet_gateway" "ig" {
+  vpc_id = aws_vpc.PRJ16-vpc.id
+
+  tags = merge(
+    var.tags,
+    {
+      Name = format("%s-%s!", aws_vpc.main.id,"IG")
+    } 
+  )
+}
+~~~
+notice how we have used format() function to dynamically generate a unique name for this resource? The first part of the %s takes the interpolated value of aws_vpc.main.id while the second %s appends a literal string IG and finally an exclamation mark is added in the end.
+
+If any of the resources being created is either using the count function, or creating multiple resources using a loop, then a key-value pair that needs to be unique must be handled differently.
+
+For example, each of our subnets should have a unique name in the tag section. Without the format() function, we would not be able to see uniqueness. With the format function, each private subnet’s tag will look like this.
+~~~
+Name = PrvateSubnet-0
+Name = PrvateSubnet-1
+Name = PrvateSubnet-2
+Lets try and see that in action.
+~~~
+~~~
+  tags = merge(
+    var.tags,
+    {
+      Name = format("PrivateSubnet-%s", count.index)
+    } 
+  )
+~~~
+
+### NAT Gateways ###
+Create 1 NAT Gateways and 1 Elastic IP (EIP) addresses
+
+Now use similar approach to create the NAT Gateways in a new file called *natgateway.tf*.
+
+Note: We need to create an Elastic IP for the NAT Gateway, and you can see the use of depends_on to indicate that the Internet Gateway resource must be available before this should be created. Although Terraform does a good job to manage dependencies, but in some cases, it is good to be explicit.
+
+You can read more on dependencies here
+
+resource "aws_eip" "prj17-nat-eip" {
+  vpc        = true
+  depends_on = [aws_internet_gateway.ig]
+
+  tags = merge(
+    var.tags,
+    {
+      Name = format("%s-EIP", var.name)
+    },
+  )
+}
+
+resource "aws_nat_gateway" "prj17-nat" {
+  allocation_id = aws_eip.nat_eip.id
+  subnet_id     = element(aws_subnet.public.*.id, 0)
+  depends_on    = [aws_internet_gateway.ig]
+
+  tags = merge(
+    var.tags,
+    {
+      Name = format("%s-Nat", var.name)
+    },
+  )
+}
+~~~
+
+Run to validate the codes so far
+~~~
+sudo terraform validate
+~~~
+![](validate.jpg)
+
 
 
 ## Create Elastic File System (EFS) ##
