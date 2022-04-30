@@ -285,11 +285,551 @@ We are going to create all the security groups in a single file, then we are goi
 
 IMPORTANT:
 
-Check out the terraform documentation for security group ![Security group](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group)
+Check out the terraform documentation for [Security group](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group)
 
-Check out the terraform documentation for security group rule ![Security group rule](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group_rule)
+Check out the terraform documentation for [Security group rule](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group_rule)
 
 Create a file and name it security.tf, copy and paste the code below
+~~~
+resource "aws_security_group" "allow_webservers-sg" {
+  name        = "allow_webservers-sg"
+  description = "Allow webservers inbound traffic"
+  vpc_id      = aws_vpc.PRJ16-vpc.id
+
+  ingress {
+    description      = "Webservers traffic from VPC"
+    from_port        = 443
+    to_port          = 443
+    protocol         = "tcp"
+    cidr_blocks      = [aws_vpc.PRJ16-vpc.cidr_block]
+  }
+  
+  ingress {
+    description      = "Webservers traffic from VPC"
+    from_port        = 80
+    to_port          = 80
+    protocol         = "tcp"
+    cidr_blocks      = [aws_vpc.PRJ16-vpc.cidr_block]
+  }
+
+  egress {
+    from_port        = 0
+    to_port          = 0
+    protocol         = "-1"
+    cidr_blocks      = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = ["::/0"]
+  }
+
+}
+
+# security group for alb, to allow acess from any where for HTTP and HTTPS traffic
+resource "aws_security_group" "prj17-extalb-sg" {
+  name        = "prj17-extalb-sg"
+  vpc_id      = aws_vpc.PRJ16-vpc.id
+  description = "Allow TLS inbound traffic"
+
+  ingress {
+    description = "HTTP"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "HTTPS"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+ tags = merge(
+    var.tags,
+    {
+      Name = "prj17-extalb-sg"
+    },
+  )
+
+}
+
+# security group for bastion, to allow access into the bastion host from you IP
+resource "aws_security_group" "prj17-bastion-sg" {
+  name        = "prj17-bastion-sg"
+  vpc_id = aws_vpc.PRJ16-vpc.id
+  description = "Allow incoming SSH connections."
+
+  ingress {
+    description = "SSH"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+   tags = merge(
+    var.tags,
+    {
+      Name = "PRJ17-Bastion-SG"
+    },
+  )
+}
+
+#security group for nginx reverse proxy, to allow access only from the external load balancer and bastion instance
+resource "aws_security_group" "prj17-nginx-sg" {
+  name   = "nginx-sg"
+  vpc_id = aws_vpc.PRJ16-vpc.id
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+   tags = merge(
+    var.tags,
+    {
+      Name = "prj17-nginx-SG"
+    },
+  )
+}
+
+resource "aws_security_group_rule" "inbound-nginx-http" {
+  type                     = "ingress"
+  from_port                = 443
+  to_port                  = 443
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.prj17-extalb-sg.id
+  security_group_id        = aws_security_group.prj17-nginx-sg.id
+}
+
+resource "aws_security_group_rule" "inbound-bastion-ssh" {
+  type                     = "ingress"
+  from_port                = 22
+  to_port                  = 22
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.prj17-bastion-sg.id
+  security_group_id        = aws_security_group.prj17-nginx-sg.id
+}
+
+# security group for internal alb, to have access only from nginx reverser proxy server
+resource "aws_security_group" "prj17-intalb-sg" {
+  name   = "prj17-intalb-sg"
+  vpc_id = aws_vpc.PRJ16-vpc.id
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = merge(
+    var.tags,
+    {
+      Name = "prj17-intalb-sg"
+    },
+  )
+
+}
+
+resource "aws_security_group_rule" "inbound-ialb-https" {
+  type                     = "ingress"
+  from_port                = 443
+  to_port                  = 443
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.prj17-nginx-sg.id
+  security_group_id        = aws_security_group.prj17-intalb-sg.id
+}
+
+# security group for webservers, to have access only from the internal load balancer and bastion instance
+resource "aws_security_group" "webserver-sg" {
+  name   = "my-asg-sg"
+  vpc_id = aws_vpc.PRJ16-vpc.id
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = merge(
+    var.tags,
+    {
+      Name = "webserver-sg"
+    },
+  )
+
+}
+
+resource "aws_security_group_rule" "inbound-web-https" {
+  type                     = "ingress"
+  from_port                = 443
+  to_port                  = 443
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.prj17-intalb-sg.id
+  security_group_id        = aws_security_group.allow_webservers-sg.id
+}
+
+resource "aws_security_group_rule" "inbound-web-ssh" {
+  type                     = "ingress"
+  from_port                = 22
+  to_port                  = 22
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.prj17-bastion-sg.id
+  security_group_id        = aws_security_group.allow_webservers-sg.id
+}
+
+# security group for datalayer to alow traffic from websever on nfs and mysql port and bastiopn host on mysql port
+resource "aws_security_group" "prj17-datalayer-sg" {
+  name   = "prj17-datalayer-sg"
+  vpc_id = aws_vpc.PRJ16-vpc.id
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+ tags = merge(
+    var.tags,
+    {
+      Name = "prj17-datalayer-sg"
+    },
+  )
+}
+
+resource "aws_security_group_rule" "inbound-nfs-port" {
+  type                     = "ingress"
+  from_port                = 2049
+  to_port                  = 2049
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.allow_webservers-sg.id
+  security_group_id        = aws_security_group.prj17-datalayer-sg.id
+}
+
+resource "aws_security_group_rule" "inbound-mysql-bastion" {
+  type                     = "ingress"
+  from_port                = 3306
+  to_port                  = 3306
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.prj17-bastion-sg.id
+  security_group_id        = aws_security_group.prj17-datalayer-sg.id
+}
+
+resource "aws_security_group_rule" "inbound-mysql-webserver" {
+  type                     = "ingress"
+  from_port                = 3306
+  to_port                  = 3306
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.allow_webservers-sg.id
+  security_group_id        = aws_security_group.prj17-datalayer-sg.id
+}
+~~~
+**IMPORTANT NOTE**: We used the aws_security_group_rule to refrence another security group in a security group.
+
+### CREATE CERTIFICATE FROM AMAZON CERIFICATE MANAGER ###
+Create *cert.tf* file and add the following code snippets to it.
+~~~
+# The entire section create a certiface, public zone, and validate the certificate using DNS method
+
+# Create the certificate using a wildcard for all the domains created in oyindamola.gq
+resource "aws_acm_certificate" "bayo" {
+  domain_name       = "*.bayo.tk"
+  validation_method = "DNS"
+}
+
+# calling the hosted zone
+data "aws_route53_zone" "bayo" {
+  name         = "bayo.tk"
+  private_zone = false
+}
+
+# selecting validation method
+resource "aws_route53_record" "bayo" {
+  for_each = {
+    for dvo in aws_acm_certificate.bayo.domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      record = dvo.resource_record_value
+      type   = dvo.resource_record_type
+    }
+  }
+
+  allow_overwrite = true
+  name            = each.value.name
+  records         = [each.value.record]
+  ttl             = 60
+  type            = each.value.type
+  zone_id         = data.aws_route53_zone.bayo.zone_id
+}
+
+# validate the certificate through DNS method
+resource "aws_acm_certificate_validation" "bayo" {
+  certificate_arn         = aws_acm_certificate.bayo.arn
+  validation_record_fqdns = [for record in aws_route53_record.bayo : record.fqdn]
+}
+
+# create records for tooling
+resource "aws_route53_record" "tooling" {
+  zone_id = data.aws_route53_zone.bayo.zone_id
+  name    = "tooling.bayo.tk"
+  type    = "A"
+
+  alias {
+    name                   = aws_lb.prj17-extalb.dns_name
+    zone_id                = aws_lb.prj17-extalb.zone_id
+    evaluate_target_health = true
+  }
+}
+
+# create records for wordpress
+resource "aws_route53_record" "wordpress" {
+  zone_id = data.aws_route53_zone.bayo.zone_id
+  name    = "wordpress.bayo.tk"
+  type    = "A"
+
+  alias {
+    name                   = aws_lb.prj17-extalb.dns_name
+    zone_id                = aws_lb.prj17-extalb.zone_id
+    evaluate_target_health = true
+  }
+}
+~~~
+
+NOTE: Read Through to change the domain name to your own domain name and every other name that needs to be changed.
+
+Check out the terraform documentation for AWS Certifivate mangarer
+
+### 3. Create an external (Internet facing) Application Load Balancer (ALB) ###
+Create a file called *alb.tf*
+
+First of all we will create the ALB, then we create the target group and lastly we will create the lsitener rule.
+
+Useful Terraform Documentation, go through this documentation and understand the arguement needed for each resources:
+
+- ALB
+- ALB-target
+- ALB-listener
+We need to create an ALB to balance the traffic between the Instances:
+~~~
+resource "aws_lb" "prj17-ext-alb" {
+  name     = "prj17-ext-alb"
+  internal = false
+  security_groups = [
+    aws_security_group.prj17-ext-alb-sg.id,
+  ]
+
+  subnets = [
+    aws_subnet.public[0].id,
+    aws_subnet.public[1].id
+  ]
+
+   tags = merge(
+    var.tags,
+    {
+      Name = "prj17-extalb"
+    },
+  )
+
+  ip_address_type    = "ipv4"
+  load_balancer_type = "application"
+}
+~~~
+
+To inform our ALB to where route the traffic we need to create a Target Group to point to its targets:
+
+~~~
+resource "aws_lb_target_group" "nginx-tgt" {
+  health_check {
+    interval            = 10
+    path                = "/healthstatus"
+    protocol            = "HTTPS"
+    timeout             = 5
+    healthy_threshold   = 5
+    unhealthy_threshold = 2
+  }
+  name        = "nginx-tgt"
+  port        = 443
+  protocol    = "HTTPS"
+  target_type = "instance"
+  vpc_id      = aws_vpc.PRJ16-vpc.id
+}
+~~~
+
+Then we will need to create a Listner for this target Group
+~~~
+resource "aws_lb_listener" "nginx-listner" {
+  load_balancer_arn = aws_lb.prj17-extalb.arn
+  port              = 443
+  protocol          = "HTTPS"
+  certificate_arn   = aws_acm_certificate_validation.bayo.certificate_arn
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.nginx-tgt.arn
+  }
+}
+~~~
+
+Add the following outputs to output.tf to print them on screen
+~~~
+output "alb_dns_name" {
+  value = aws_lb.ext-alb.dns_name
+}
+
+output "alb_target_group_arn" {
+  value = aws_lb_target_group.nginx-tgt.arn
+}
+~~~
+
+## Create an Internal Application Load Balancer (ALB) ##
+
+For the Internal Load balancer we will fOllow the same concepts with the external load balancer.
+Add the code snippets inside the **alb.tf** file
+~~~
+# ----------------------------
+#Internal Load Balancers for webservers
+#---------------------------------
+
+resource "aws_lb" "prj17-int-alb" {
+  name     = "prj17-int-alb"
+  internal = true
+  security_groups = [
+    aws_security_group.prj17-intalb-sg.id,
+  ]
+
+  subnets = [
+    aws_subnet.private-webs[0].id,
+    aws_subnet.private-webs[1].id,
+    aws_subnet.private-data[0].id,
+    aws_subnet.private-data[1].id
+  ]
+
+  tags = merge(
+    var.tags,
+    {
+      Name = "PRJ17-int-alb"
+    },
+  )
+
+  ip_address_type    = "ipv4"
+  load_balancer_type = "application"
+}
+~~~
+
+To inform our ALB to where route the traffic we need to create a Target Group to point to its targets:
+
+~~~
+# --- target group  for wordpress -------
+
+resource "aws_lb_target_group" "wordpress-tgt" {
+  health_check {
+    interval            = 10
+    path                = "/healthstatus"
+    protocol            = "HTTPS"
+    timeout             = 5
+    healthy_threshold   = 5
+    unhealthy_threshold = 2
+  }
+
+  name        = "wordpress-tgt"
+  port        = 443
+  protocol    = "HTTPS"
+  target_type = "instance"
+  vpc_id      = aws_vpc.PRJ16-vpc.id
+}
+
+# --- target group for tooling -------
+
+resource "aws_lb_target_group" "tooling-tgt" {
+  health_check {
+    interval            = 10
+    path                = "/healthstatus"
+    protocol            = "HTTPS"
+    timeout             = 5
+    healthy_threshold   = 5
+    unhealthy_threshold = 2
+  }
+
+  name        = "tooling-tgt"
+  port        = 443
+  protocol    = "HTTPS"
+  target_type = "instance"
+  vpc_id      = aws_vpc.PRJ16-vpc.id
+}
+~~~
+
+Then we will need to create a Listner for this target Group
+~~~
+# For this aspect a single listener was created for the wordpress which is default,
+# A rule was created to route traffic to tooling when the host header changes
+
+resource "aws_lb_listener" "webs-listener" {
+  load_balancer_arn = aws_lb.prj17-int-alb.arn
+  port              = 443
+  protocol          = "HTTPS"
+  certificate_arn   = aws_acm_certificate_validation.bayo.certificate_arn
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.wordpress-tgt.arn
+  }
+}
+
+# listener rule for tooling target
+
+resource "aws_lb_listener_rule" "tooling-listener" {
+  listener_arn = aws_lb_listener.webs-listener.arn
+  priority     = 99
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.tooling-tgt.arn
+  }
+
+  condition {
+    host_header {
+      values = ["tooling.bayo.tk"]
+    }
+  }
+}
+~~~
+
+### CREATING AUSTOALING GROUPS ###
+
+This Section we will create the Auto Scaling Group (ASG)
+Now we need to configure our ASG to be able to scale the EC2s out and in depending on the application traffic.
+
+Before we start configuring an ASG, we need to create the launch template and the the AMI needed. For now we are going to use a random AMI from AWS, then in project 19, we will use Packerto create our ami.
+
+Based on our Architetcture we need for Auto Scaling Groups for bastion, nginx, wordpress and tooling, so we will create two files; *asg-bastion-nginx.tf* will contain Launch Template and Austoscaling froup for Bastion and Nginx, then *asg-wordpress-tooling.tf* will contain Launch Template and Austoscaling group for wordpress and tooling.
+
+Useful Terraform Documentation, go through this documentation and understand the arguement needed for each resources:
+
+- [SNS Topics](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/sns_topic)
+- [SNS-notification](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/autoscaling_notification)
+- [Austoscaling](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/autoscaling_group)
+- [Launch-template](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/launch_template)
+
+Create asg-bastion-nginx.tf and paste all the code snippet below;
+
 ## Create Elastic File System (EFS) ##
 
 In order to create an EFS you need to create a KMS key.
