@@ -65,6 +65,7 @@ Name = PrvateSubnet-1
 Name = PrvateSubnet-2
 Lets try and see that in action.
 ~~~
+
 ~~~
   tags = merge(
     var.tags,
@@ -79,10 +80,9 @@ Create 1 NAT Gateways and 1 Elastic IP (EIP) addresses
 
 Now use similar approach to create the NAT Gateways in a new file called *natgateway.tf*.
 
-Note: We need to create an Elastic IP for the NAT Gateway, and you can see the use of depends_on to indicate that the Internet Gateway resource must be available before this should be created. Although Terraform does a good job to manage dependencies, but in some cases, it is good to be explicit.
+Note: We need to create an Elastic IP for the NAT Gateway, and you can see the use of depends_on to indicate that the Internet Gateway resource must be available before this should be created. Although Terraform does a good job to manage dependencies, but in some cases, it is good to be explicit
 
-You can read more on dependencies here
-
+~~~
 resource "aws_eip" "prj17-nat-eip" {
   vpc        = true
   depends_on = [aws_internet_gateway.ig]
@@ -116,6 +116,87 @@ sudo terraform validate
 ![](validate.jpg)
 
 
+### AWS ROUTES ###
+Create a file called route_tables.tf and use it to create routes for both public and private subnets, create the below resources. Ensure they are properly tagged.
+
+- aws_route_table
+- aws_route
+- aws_route_table_association
+
+~~~
+# create webserver private route table
+resource "aws_route_table" "webs-private-rtb" {
+  vpc_id = aws_vpc.PRJ16-vpc.id
+
+  tags = merge(
+    var.tags,
+    {
+      Name = format("%s-Private-Route-Table", var.name)
+    },
+  )
+}
+
+# associate webs private subnets to the private route table
+resource "aws_route_table_association" "webs-private-subnets-assoc" {
+  count          = length(aws_subnet.private-webs[*].id)
+  subnet_id      = element(aws_subnet.private-webs[*].id, count.index)
+  route_table_id = aws_route_table.webs-private-rtb.id
+}
+
+
+# create datalayer private route table
+resource "aws_route_table" "data-private-rtb" {
+  vpc_id = aws_vpc.PRJ16-vpc.id
+
+  tags = merge(
+    var.tags,
+    {
+      Name = format("%s-Private-Route-Table", var.name)
+    },
+  )
+}
+
+# associate data private subnets to the private route table
+resource "aws_route_table_association" "data-private-subnets-assoc" {
+  count          = length(aws_subnet.private-data[*].id)
+  subnet_id      = element(aws_subnet.private-data[*].id, count.index)
+  route_table_id = aws_route_table.data-private-rtb.id
+}
+
+# create route table for the public subnets
+resource "aws_route_table" "public-rtb" {
+  vpc_id = aws_vpc.PRJ16-vpc.id
+
+  tags = merge(
+    var.tags,
+    {
+      Name = format("%s-Public-Route-Table", var.name)
+    },
+  )
+}
+# create route for the public route table and attach the internet gateway
+resource "aws_route" "public-rtb-route" {
+  route_table_id         = aws_route_table.public-rtb.id
+  destination_cidr_block = "0.0.0.0/0"
+  gateway_id             = aws_internet_gateway.ig.id
+}
+
+# associate all public subnets to the public route table
+resource "aws_route_table_association" "public-subnets-assoc" {
+  count          = length(aws_subnet.public[*].id)
+  subnet_id      = element(aws_subnet.public[*].id, count.index)
+  route_table_id = aws_route_table.public-rtb.id
+  }
+~~~
+We now have:
+
+– [x] Our main vpc
+– [x] 1 Public subnets
+– [x] 4 Private subnets
+– [x] 1 Internet Gateway
+– [x] 1 NAT Gateway
+– [x] 1 EIP
+– [x] 3 Route tables
 
 ## Create Elastic File System (EFS) ##
 
