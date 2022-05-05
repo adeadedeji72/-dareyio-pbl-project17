@@ -1274,6 +1274,32 @@ terraform apply
 ![](terraform_apply.jpg)
 to build the infrastructure
 
+### Created Resources
+
+![](ec2.jpg)
+EC2 Instances
+
+![](efs2.jpg)
+Elastic File System
+
+![](asg2.jpg)
+Auto Scalling Group
+
+![](target_groups.jpg)
+Target Groups
+
+![](alb.jpg)
+Application Load Balancer
+
+![](security_groups.jpg)
+Security Groups
+
+![](launch-templates2.jpg)
+Launch Templates
+
+![](kms.jpg)
+Key Management System
+
 **Additional tasks**
 1. **IP Address**: This is a means of uniquely identifying a computer host on a network. There are two versions currently in use, IPV4 and IPV6. IPV4 is a 32bit address written in dot notation like this 172.17.16.1, depending on the cidr used, a part of the address refers to the network portion while the other part describes the host part. IPV6 on the other hand is 128bit long, meaning there are 2 raise to the power of 128 (trillion trillion trillion possible addresses) It is written in hex format as against IPV4 which is written in decimal format. 00ab::45EA:1234::0A::0 
 1. **Subnets**: A subnet is a logical delineation of a larger network to seperate network host for security and other network management reasons. So a big network can besub-divided into smaller ones. 10.0.0.0/24 (256 addresses) can be divided into 10.0.0.0/25 and 10.0.0.128/23 (126 addresses each)
