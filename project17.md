@@ -3,7 +3,7 @@
 ## Private Subnets ##
 Create two groups of Private subnets
 1. Webservers Private Subnet (one per AZ)
-1. atalayer Private Subnet (one per AZ)
+1. Datalayer Private Subnet (one per AZ)
 
 
 Make sure you use variables or *length()* function to determine the number of AZs
