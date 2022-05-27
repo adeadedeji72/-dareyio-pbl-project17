@@ -191,7 +191,7 @@ resource "aws_route_table_association" "public-subnets-assoc" {
 We now have:
 
 - [x] Our main vpc
-- [x] 1 Public subnets
+- [x] 2 Public subnets
 - [x] 4 Private subnets
 - [x] 1 Internet Gateway
 - [x] 1 NAT Gateway
