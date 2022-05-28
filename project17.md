@@ -548,9 +548,9 @@ resource "aws_security_group_rule" "inbound-mysql-webserver" {
 ### CREATE CERTIFICATE FROM AMAZON CERIFICATE MANAGER ###
 Create *cert.tf* file and add the following code snippets to it.
 ~~~
-# The entire section create a certiface, public zone, and validate the certificate using DNS method
+# The entire section create a certifate, public zone, and validate the certificate using DNS method
 
-# Create the certificate using a wildcard for all the domains created in oyindamola.gq
+# Create the certificate using a wildcard for all the domains created in bayo.tk
 resource "aws_acm_certificate" "bayo" {
   domain_name       = "*.bayo.tk"
   validation_method = "DNS"
@@ -615,7 +615,7 @@ resource "aws_route53_record" "wordpress" {
 
 NOTE: Read Through to change the domain name to your own domain name and every other name that needs to be changed.
 
-Check out the terraform documentation for AWS Certifivate mangarer
+Check out the terraform documentation for AWS Certificate manager
 
 ### 3. Create an external (Internet facing) Application Load Balancer (ALB) ###
 Create a file called *alb.tf*
